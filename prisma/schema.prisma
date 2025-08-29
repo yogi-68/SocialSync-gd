@@ -1,0 +1,104 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int           @id @default(autoincrement())
+  email         String        @unique
+  name          String
+  password_hash String
+  plan          String        @default("starter")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  accounts      UserAccount[]
+  posts         Post[]
+
+  @@map("users")
+}
+
+model Platform {
+  id           Int           @id @default(autoincrement())
+  name         String
+  api_endpoint String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+  userAccounts UserAccount[]
+  postPlatforms PostPlatform[]
+  analytics    Analytics[]
+
+  @@map("platforms")
+}
+
+model UserAccount {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  platformId      Int
+  account_name    String?
+  access_token    String?
+  refresh_token   String?
+  followers_count Int?     @default(0)
+  is_active       Boolean  @default(true)
+  connected_at    DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform        Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platformId])
+  @@map("user_accounts")
+}
+
+model Post {
+  id          Int            @id @default(autoincrement())
+  userId      Int
+  content     String
+  media_urls  String         @default("[]") // Store as JSON string in SQLite
+  status      String         @default("draft") // draft, scheduled, published, failed
+  scheduled_for DateTime?
+  published_at  DateTime?
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platforms   PostPlatform[]
+  analytics   Analytics[]
+
+  @@map("posts")
+}
+
+model PostPlatform {
+  id              Int      @id @default(autoincrement())
+  postId          Int
+  platformId      Int
+  platform_post_id String?
+  status          String   @default("pending") // pending, published, failed
+  error_message   String?
+  published_at    DateTime?
+  post            Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  platform        Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, platformId])
+  @@map("post_platforms")
+}
+
+model Analytics {
+  id              Int       @id @default(autoincrement())
+  postId          Int
+  platformId      Int
+  views           Int       @default(0)
+  likes           Int       @default(0)
+  comments        Int       @default(0)
+  shares          Int       @default(0)
+  engagement_rate Float     @default(0)
+  recorded_at     DateTime  @default(now())
+  post            Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  platform        Platform  @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, platformId, recorded_at])
+  @@map("analytics")
+}

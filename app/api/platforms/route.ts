@@ -1,41 +1,124 @@
 import { type NextRequest, NextResponse } from "next/server"
-
-// Mock platform connections
-const connectedPlatforms = [
-  { id: "twitter", name: "Twitter/X", connected: true, followers: 12500 },
-  { id: "facebook", name: "Facebook", connected: true, followers: 8200 },
-  { id: "instagram", name: "Instagram", connected: true, followers: 15800 },
-  { id: "linkedin", name: "LinkedIn", connected: true, followers: 5100 },
-  { id: "tiktok", name: "TikTok", connected: false, followers: 0 },
-  { id: "youtube", name: "YouTube", connected: false, followers: 0 },
-]
+import { PrismaClient } from "@/lib/generated/prisma"
+const prisma = new PrismaClient()
 
 export async function GET() {
-  return NextResponse.json({ platforms: connectedPlatforms })
+  try {
+    // TODO: Get userId from session
+    const userId = 1
+
+    const allPlatforms = await prisma.platform.findMany()
+    const userAccounts = await prisma.userAccount.findMany({
+      where: { userId },
+    })
+
+    const platforms = allPlatforms.map((platform) => {
+      const account = userAccounts.find((acc) => acc.platformId === platform.id)
+      return {
+        id: platform.id,
+        name: platform.name,
+        connected: !!account,
+        followers: account?.followers_count || 0,
+      }
+    })
+
+    return NextResponse.json({ platforms })
+  } catch (error) {
+    console.error("Error fetching platforms:", error)
+    return NextResponse.json({ error: "Failed to fetch platforms" }, { status: 500 })
+  }
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json()
-  const { platformId, action } = body
+  try {
+    const body = await request.json()
+    const { platformId, action } = body
+    
+    if (!platformId) {
+      return NextResponse.json({ error: "Platform ID is required" }, { status: 400 })
+    }
+    
+    if (!action) {
+      return NextResponse.json({ error: "Action is required" }, { status: 400 })
+    }
 
-  const platformIndex = connectedPlatforms.findIndex((p) => p.id === platformId)
+    // TODO: Get userId from session
+    const userId = 1
 
-  if (platformIndex === -1) {
-    return NextResponse.json({ error: "Platform not found" }, { status: 404 })
+    const platform = await prisma.platform.findUnique({ 
+      where: { id: platformId } 
+    })
+    
+    if (!platform) {
+      return NextResponse.json({ error: "Platform not found" }, { status: 404 })
+    }
+
+    let message = ""
+    let result
+
+    if (action === "connect") {
+      // Check if already connected
+      const existingAccount = await prisma.userAccount.findUnique({
+        where: {
+          userId_platformId: {
+            userId,
+            platformId,
+          },
+        }
+      })
+      
+      if (existingAccount) {
+        return NextResponse.json({ 
+          error: `${platform.name} is already connected` 
+        }, { status: 400 })
+      }
+      
+      result = await prisma.userAccount.create({
+        data: {
+          userId,
+          platformId,
+          account_name: "example", // TODO: Get from OAuth
+          access_token: "example", // TODO: Get from OAuth
+          followers_count: Math.floor(Math.random() * 10000) + 1000,
+        },
+      })
+      message = `Successfully connected ${platform.name}`
+    } else if (action === "disconnect") {
+      const existingAccount = await prisma.userAccount.findUnique({
+        where: {
+          userId_platformId: {
+            userId,
+            platformId,
+          },
+        }
+      })
+      
+      if (!existingAccount) {
+        return NextResponse.json({ 
+          error: `${platform.name} is not connected` 
+        }, { status: 400 })
+      }
+      
+      result = await prisma.userAccount.delete({
+        where: {
+          userId_platformId: {
+            userId,
+            platformId,
+          },
+        },
+      })
+      message = `Successfully disconnected ${platform.name}`
+    } else {
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      platform: result,
+      message,
+    })
+  } catch (error) {
+    console.error("Error managing platform connection:", error)
+    return NextResponse.json({ error: "Failed to process request" }, { status: 500 })
   }
-
-  if (action === "connect") {
-    connectedPlatforms[platformIndex].connected = true
-    // Simulate getting follower count
-    connectedPlatforms[platformIndex].followers = Math.floor(Math.random() * 10000) + 1000
-  } else if (action === "disconnect") {
-    connectedPlatforms[platformIndex].connected = false
-    connectedPlatforms[platformIndex].followers = 0
-  }
-
-  return NextResponse.json({
-    success: true,
-    platform: connectedPlatforms[platformIndex],
-    message: `Successfully ${action}ed ${connectedPlatforms[platformIndex].name}`,
-  })
 }

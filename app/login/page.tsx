@@ -3,14 +3,14 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Zap, Mail, Lock, Eye, EyeOff } from "lucide-react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { Eye, EyeOff, Mail, Lock, Zap, Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -23,16 +23,48 @@ export default function LoginPage() {
     e.preventDefault()
     setIsLoading(true)
 
-    // Simulate login
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
 
-    // Redirect to dashboard
-    router.push("/dashboard")
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed')
+      }
+      
+      // Redirect to dashboard on successful login
+      router.push("/dashboard")
+    } catch (error) {
+      console.error('Login error:', error)
+      alert(error instanceof Error ? error.message : 'Failed to login. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleGoogleLogin = () => {
-    // Simulate Google OAuth
-    router.push("/dashboard")
+  const handleGoogleLogin = async () => {
+    // For now, we'll simulate Google OAuth since we don't have a real OAuth implementation
+    setIsLoading(true)
+    
+    try {
+      // In a real implementation, this would redirect to Google's OAuth page
+      // For now, we'll simulate a successful login after a delay
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // In a real app, we would process the OAuth response
+      router.push("/dashboard")
+    } catch (error) {
+      console.error('Google login error:', error)
+      alert('Failed to login with Google. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -140,7 +172,7 @@ export default function LoginPage() {
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Signing in...
                   </>
                 ) : (

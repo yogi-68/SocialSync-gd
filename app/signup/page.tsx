@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Zap, Mail, Lock, Eye, EyeOff, User } from "lucide-react"
+import { Zap, Mail, Lock, Eye, EyeOff, User, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
@@ -27,17 +27,59 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    
+    if (formData.password !== formData.confirmPassword) {
+      alert("Passwords don't match");
+      setIsLoading(false);
+      return;
+    }
 
-    // Simulate signup
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
 
-    // Redirect to dashboard
-    router.push("/dashboard")
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Signup failed');
+      }
+      
+      // Redirect to dashboard on successful signup
+      router.push("/dashboard");
+    } catch (error) {
+      console.error('Signup error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to sign up. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  const handleGoogleSignup = () => {
-    // Simulate Google OAuth
-    router.push("/dashboard")
+  const handleGoogleSignup = async () => {
+    // For now, we'll simulate Google OAuth since we don't have a real OAuth implementation
+    setIsLoading(true);
+    
+    try {
+      // In a real implementation, this would redirect to Google's OAuth page
+      // For now, we'll simulate a successful login after a delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // In a real app, we would process the OAuth response
+      router.push("/dashboard");
+    } catch (error) {
+      console.error('Google signup error:', error);
+      alert('Failed to sign up with Google. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -172,7 +214,7 @@ export default function SignupPage() {
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating account...
                   </>
                 ) : (
